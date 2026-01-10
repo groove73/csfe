@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useMemo, ChangeEvent } from 'react';
+import { useEffect, useState, useRef, useMemo, ChangeEvent, Suspense } from 'react';
 import { MapComponent } from '@/components/MapComponent';
 import { StationDetail } from '@/components/StationDetail';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,7 +33,7 @@ const REGION_CENTERS: Record<string, { lat: number, lng: number }> = {
   '50': { lat: 33.4996, lng: 126.5312 }, // Jeju
 };
 
-export default function Page() {
+const HomeContent = () => {
   const { user, isGuest, guestToken, loading: authLoading, logout } = useAuth();
   const router = useRouter();
   const [stations, setStations] = useState<any[]>([]);
@@ -372,5 +372,25 @@ export default function Page() {
         </div>
       )}
     </main>
+  );
+};
+
+export default function Page() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0f1d] text-white">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center animate-pulse shadow-[0_0_30px_rgba(37,99,235,0.4)]">
+            <Zap className="text-white w-6 h-6 fill-white" />
+          </div>
+          <h1 className="text-2xl font-black tracking-tight text-white/80">
+            EV CONNECT
+          </h1>
+        </div>
+        <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+      </div>
+    }>
+      <HomeContent />
+    </Suspense>
   );
 }
