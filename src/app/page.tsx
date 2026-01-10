@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Search, MapPin, Building2, Zap, LogOut, User as UserIcon } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 const REGION_CENTERS: Record<string, { lat: number, lng: number }> = {
@@ -47,11 +47,31 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null);
   const lastParamsRef = useRef({ zcode: '' });
 
+  const searchParams = useSearchParams();
+  const code = searchParams.get('code');
+
   useEffect(() => {
-    if (!authLoading && !user && !isGuest) {
-      router.push('/login');
-    }
-  }, [user, isGuest, authLoading, router]);
+    const handleAuth = async () => {
+      if (code) {
+        // If there is a code, try to exchange it for a session
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (!error) {
+          // If successful, the AuthContext will pick up the change
+          // Remove the code from the URL for cleaner history
+          const newUrl = window.location.pathname;
+          window.history.replaceState({}, '', newUrl);
+          return;
+        }
+      }
+
+      // Standard auth check
+      if (!authLoading && !user && !isGuest) {
+        router.push('/login');
+      }
+    };
+
+    handleAuth();
+  }, [user, isGuest, authLoading, router, code]);
 
   // Fetch regions on mount
   useEffect(() => {
