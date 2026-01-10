@@ -5,6 +5,8 @@ import { CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/components/auth/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 interface StationDetailProps {
     station: any;
@@ -12,6 +14,7 @@ interface StationDetailProps {
 }
 
 export function StationDetail({ station, onClose }: StationDetailProps) {
+    const { user, guestToken } = useAuth();
     const [chargers, setChargers] = useState<any[]>(station.chargers || []);
     const [loading, setLoading] = useState(true);
 
@@ -39,7 +42,15 @@ export function StationDetail({ station, onClose }: StationDetailProps) {
     const fetchChargerStatus = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/stations/${station.statId}/chargers`);
+            const headers: Record<string, string> = {};
+            if (user) {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
+            } else if (guestToken) {
+                headers['Authorization'] = `Bearer ${guestToken}`;
+            }
+
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/stations/${station.statId}/chargers`, { headers });
             if (!res.ok) throw new Error('Fetch failed');
             const realTimeData = await res.json();
             setChargers(mergeChargerData(realTimeData));

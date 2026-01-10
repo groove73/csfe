@@ -8,7 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Search, MapPin, Building2, Zap } from 'lucide-react';
+import { Search, MapPin, Building2, Zap, LogOut, User as UserIcon } from 'lucide-react';
+import { useAuth } from '@/components/auth/AuthContext';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 const REGION_CENTERS: Record<string, { lat: number, lng: number }> = {
   '11': { lat: 37.5665, lng: 126.9780 }, // Seoul
@@ -31,6 +34,8 @@ const REGION_CENTERS: Record<string, { lat: number, lng: number }> = {
 };
 
 export default function Page() {
+  const { user, isGuest, guestToken, loading: authLoading, logout } = useAuth();
+  const router = useRouter();
   const [stations, setStations] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [filterKeyword, setFilterKeyword] = useState('');
@@ -39,7 +44,14 @@ export default function Page() {
   const [loading, setLoading] = useState(false);
   const [selectedStation, setSelectedStation] = useState<any>(null);
   const [stationDetail, setStationDetail] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
   const lastParamsRef = useRef({ zcode: '' });
+
+  useEffect(() => {
+    if (!authLoading && !user && !isGuest) {
+      router.push('/login');
+    }
+  }, [user, isGuest, authLoading, router]);
 
   // Fetch regions on mount
   useEffect(() => {
@@ -47,7 +59,8 @@ export default function Page() {
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/stations/regions`);
         if (res.ok) {
-          const data = await res.json();
+          const text = await res.text();
+          const data = text ? JSON.parse(text) : {};
           setRegions(data);
         }
       } catch (err) {
@@ -57,12 +70,19 @@ export default function Page() {
     fetchRegions();
   }, []);
 
-  // Initial load Seoul handled by zcode change
+  // Initial load handled by zcode change, but only if auth is ready
   useEffect(() => {
-    handleSearch();
-  }, [zcode]);
+    if (!authLoading && (user || isGuest)) {
+      handleSearch();
+    }
+  }, [zcode, user, isGuest, authLoading]);
 
   const handleSearch = async () => {
+    // Only search if authenticated or guest, and not already loading auth
+    if (authLoading || (!user && !isGuest)) {
+      return;
+    }
+
     // Prevent duplicate calls for same region
     if (lastParamsRef.current.zcode === zcode) {
       return;
@@ -81,8 +101,36 @@ export default function Page() {
         });
       }
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/stations?zcode=${zcode}`);
-      const data = await res.json();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+
+      if (user) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+      } else if (guestToken) {
+        headers['Authorization'] = `Bearer ${guestToken}`;
+      }
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/stations?zcode=${zcode}`, { headers });
+
+      if (res.status === 403 || res.status === 429) {
+        const msg = res.status === 429
+          ? 'Rate limit reached (5 searches/min). Please wait a moment.'
+          : 'Guest limit reached. Please log in for more.';
+        setError(msg);
+        setStations([]);
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+      }
+
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : [];
       if (Array.isArray(data)) {
         setStations(data);
         setFilterKeyword(search);
@@ -131,8 +179,51 @@ export default function Page() {
               <p className="text-blue-400 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Real-time Station Finder</p>
             </div>
           </div>
+          <div className="flex items-center gap-2">
+            {user ? (
+              <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20 py-1 px-3 rounded-lg hidden md:flex items-center gap-2">
+                <UserIcon className="w-3 h-3" />
+                <span className="text-[10px] font-bold truncate max-w-[100px]">{user.email}</span>
+              </Badge>
+            ) : isGuest && (
+              <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/20 py-1 px-3 rounded-lg hidden md:flex items-center gap-2">
+                <span className="text-[10px] font-heavy">GUEST MODE</span>
+              </Badge>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={logout}
+              className="text-slate-400 hover:text-white hover:bg-white/5 rounded-xl h-9 w-9"
+            >
+              <LogOut className="w-4 h-4" />
+            </Button>
+          </div>
         </header>
 
+        {error && (
+          <div className="bg-amber-500/10 border-2 border-amber-500/20 p-5 rounded-2xl text-amber-400 animate-in fade-in slide-in-from-top-4 duration-500 shadow-[0_0_30px_rgba(245,158,11,0.1)]">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                <div className="bg-amber-500 rounded-lg p-1.5 shrink-0">
+                  <Zap className="w-4 h-4 text-[#0a0f1d] fill-[#0a0f1d]" />
+                </div>
+                <p className="text-sm font-black uppercase tracking-tight leading-tight">
+                  Guest Limit Reached
+                </p>
+              </div>
+              <p className="text-[11px] font-bold text-amber-500/80 leading-relaxed pl-1">
+                You've used all 5 guest searches. Please sign in to continue enjoying EV CONNECT with unlimited access.
+              </p>
+              <Button
+                onClick={() => router.push('/login')}
+                className="w-full mt-1 bg-amber-500 hover:bg-amber-400 text-[#0a0f1d] font-black h-10 rounded-xl transition-all active:scale-[0.98] text-[11px] uppercase tracking-wider"
+              >
+                Sign In Now
+              </Button>
+            </div>
+          </div>
+        )}
         <section className="space-y-4 flex-1 flex flex-col overflow-hidden">
           <div className="bg-white/5 p-3 md:p-4 rounded-2xl md:rounded-3xl border border-white/5">
             <div className="flex flex-col gap-3">
