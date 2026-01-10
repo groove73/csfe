@@ -52,10 +52,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const loginWithGoogle = async () => {
+        let redirectUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+        // Strip trailing slash if present to avoid double slashes
+        redirectUrl = redirectUrl.replace(/\/$/, '');
+
         await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: `${window.location.origin}/auth/callback`,
+                redirectTo: `${redirectUrl}/auth/callback`,
             },
         });
     };
