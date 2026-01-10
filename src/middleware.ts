@@ -39,7 +39,7 @@ export async function middleware(req: NextRequest) {
     const isGuestMode = req.cookies.get('guest_mode_active')?.value === 'true';
 
     // If the user is not logged in and not in guest mode, redirect to login
-    if (!user && !isGuestMode && !req.nextUrl.pathname.startsWith('/login')) {
+    if (!user && !isGuestMode && !req.nextUrl.pathname.startsWith('/login') && !req.nextUrl.pathname.startsWith('/auth')) {
         return NextResponse.redirect(new URL('/login', req.url));
     }
 
