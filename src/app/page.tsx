@@ -12,6 +12,7 @@ import { Search, MapPin, Building2, Zap, LogOut, User as UserIcon } from 'lucide
 import { useAuth } from '@/components/auth/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { API_BASE_URL } from '@/lib/api';
 
 const REGION_CENTERS: Record<string, { lat: number, lng: number }> = {
   '11': { lat: 37.5665, lng: 126.9780 }, // Seoul
@@ -77,7 +78,7 @@ const HomeContent = () => {
   useEffect(() => {
     const fetchRegions = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/stations/regions`);
+        const res = await fetch(`${API_BASE_URL}/api/stations/regions`);
         if (res.ok) {
           const text = await res.text();
           const data = text ? JSON.parse(text) : {};
@@ -134,7 +135,7 @@ const HomeContent = () => {
         headers['Authorization'] = `Bearer ${guestToken}`;
       }
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/stations?zcode=${zcode}`, { headers });
+      const res = await fetch(`${API_BASE_URL}/api/stations?zcode=${zcode}`, { headers });
 
       if (res.status === 403 || res.status === 429) {
         const msg = res.status === 429

@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/auth/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { API_BASE_URL } from '@/lib/api';
 
 interface StationDetailProps {
     station: any;
@@ -50,7 +51,7 @@ export function StationDetail({ station, onClose }: StationDetailProps) {
                 headers['Authorization'] = `Bearer ${guestToken}`;
             }
 
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/stations/${station.statId}/chargers`, { headers });
+            const res = await fetch(`${API_BASE_URL}/api/stations/${station.statId}/chargers`, { headers });
             if (!res.ok) throw new Error('Fetch failed');
             const realTimeData = await res.json();
             setChargers(mergeChargerData(realTimeData));
